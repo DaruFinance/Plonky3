@@ -1,3 +1,5 @@
+> **This fork adds AIRCov:** a coverage metric that reports whether each guarded AIR constraint was actually enforced by a trace, surfacing wrong-guard and wrong-selector soundness bugs that ordinary line coverage marks as fully covered. See [AIRCOV.md](AIRCOV.md).
+
 ![Plonky3-powered-by-polygon](https://github.com/Plonky3/Plonky3/assets/86010/7ec356ad-b0f3-4c4c-aa1d-3a151c1065e7)
 
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](https://github.com/Plonky3/Plonky3/blob/main/LICENSE-MIT)
