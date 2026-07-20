@@ -54,6 +54,10 @@ impl<AB: AirBuilder> AirBuilder for FilteredAirBuilder<'_, AB> {
     }
 
     fn assert_zero<I: Into<Self::Expr>>(&mut self, x: I) {
+        // AIRCov: report the guard applying to this constraint to the inner
+        // builder *before* it is folded into the term (after multiplication the
+        // guard and the constrained expression are indistinguishable).
+        self.inner.aircov_note_guard(&self.condition);
         self.inner.assert_zero(self.condition() * x.into());
     }
 

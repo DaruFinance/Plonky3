@@ -5,6 +5,7 @@
 extern crate alloc;
 
 mod air;
+pub mod aircov;
 mod builder;
 mod check_constraints;
 mod filtered;

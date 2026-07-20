@@ -15,6 +15,11 @@ p3-matrix.workspace = true
 serde = { workspace = true, features = ["derive", "alloc"] }
 tracing.workspace = true
 
+[features]
+# AIRCov semantic-coverage recorder (pulls in std for a thread-local). Off by
+# default so normal builders stay no_std and pay nothing.
+aircov = []
+
 [dev-dependencies]
 p3-baby-bear = { path = "../baby-bear" }
 p3-field = { path = "../field" }

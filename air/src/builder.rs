@@ -133,6 +133,13 @@ pub trait AirBuilder: Sized {
     /// into a single assert_zeros call will improve performance.
     fn assert_zero<I: Into<Self::Expr>>(&mut self, x: I);
 
+    /// AIRCov hook: note the guard condition that applies to the *next*
+    /// asserted constraint. Called by [`FilteredAirBuilder`] before it
+    /// multiplies a constraint by its guard. Default is a no-op; only the
+    /// coverage-collecting debug builder overrides it to record whether the
+    /// guard was active on the current row.
+    fn aircov_note_guard(&mut self, _guard: &Self::Expr) {}
+
     /// Assert that every element of a given array is 0.
     ///
     /// This should be preferred over calling `assert_zero` multiple times.

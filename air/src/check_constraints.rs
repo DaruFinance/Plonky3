@@ -309,6 +309,12 @@ where
         self.assert_zero_named(x, "");
     }
 
+    /// AIRCov: record whether the guard for the next assertion is active
+    /// (nonzero) on the current concrete row.
+    fn aircov_note_guard(&mut self, guard: &Self::Expr) {
+        crate::aircov::note_guard(*guard != F::ZERO);
+    }
+
     fn public_values(&self) -> &[Self::PublicVar] {
         self.public_values
     }
@@ -376,7 +382,10 @@ impl<F: Field, EF: ExtensionField<F>> NamedAirBuilder for DebugConstraintBuilder
         I: Into<Self::Expr>,
         N: Name,
     {
-        if x.into() != F::ZERO {
+        let v = x.into();
+        // AIRCov: record activation/tightness for this constraint site on this row.
+        crate::aircov::on_assert(self.constraint_index, self.row_index, v == F::ZERO);
+        if v != F::ZERO {
             let label = name.evaluate().to_string();
             self.failures.push(ConstraintFailure {
                 row: self.row_index,
@@ -502,6 +511,76 @@ where
             );
         }
     }
+}
+
+/// AIRCov: evaluate every AIR constraint against a concrete (valid) trace and
+/// return per-constraint-site semantic coverage instead of checking validity.
+///
+/// Runs the same row-by-row `DebugConstraintBuilder` evaluation as
+/// [`check_constraints`], but records, per constraint site, whether its guard
+/// was active/inactive on each row and whether the guarded term held. See
+/// [`crate::aircov`]. The trace is assumed valid (this measures test-input
+/// adequacy, not soundness).
+#[cfg(feature = "aircov")]
+pub fn collect_coverage<F, A>(
+    air: &A,
+    main: &RowMajorMatrix<F>,
+    public_values: &[F],
+) -> crate::aircov::Recorder
+where
+    F: Field,
+    A: for<'a> Air<DebugConstraintBuilder<'a, F>>,
+{
+    let height = main.height();
+    let preprocessed = air.preprocessed_trace();
+
+    crate::aircov::begin();
+
+    for row_index in 0..height {
+        let row_index_next = (row_index + 1) % height;
+
+        // SAFETY: both indices are strictly less than `height`.
+        let local = unsafe { main.row_slice_unchecked(row_index) };
+        let next = unsafe { main.row_slice_unchecked(row_index_next) };
+
+        let main_pair = ViewPair::new(
+            RowMajorMatrixView::new_row(&*local),
+            RowMajorMatrixView::new_row(&*next),
+        );
+
+        let (prep_local, prep_next) = preprocessed.as_ref().map_or((None, None), |prep| unsafe {
+            (
+                Some(prep.row_slice_unchecked(row_index)),
+                Some(prep.row_slice_unchecked(row_index_next)),
+            )
+        });
+        let preprocessed_pair = match (prep_local.as_ref(), prep_next.as_ref()) {
+            (Some(l), Some(n)) => ViewPair::new(
+                RowMajorMatrixView::new_row(&**l),
+                RowMajorMatrixView::new_row(&**n),
+            ),
+            _ => ViewPair::new(
+                RowMajorMatrixView::new(&[], 0),
+                RowMajorMatrixView::new(&[], 0),
+            ),
+        };
+
+        let periodic_row = air.periodic_values(row_index);
+        let mut builder = DebugConstraintBuilder::new(
+            row_index,
+            main_pair,
+            preprocessed_pair,
+            public_values,
+            F::from_bool(row_index == 0),
+            F::from_bool(row_index == height - 1),
+            F::from_bool(row_index != height - 1),
+            &periodic_row,
+        );
+
+        air.eval(&mut builder);
+    }
+
+    crate::aircov::take().unwrap_or_default()
 }
 
 /// Evaluate every AIR constraint against a concrete trace and collect
